@@ -1,0 +1,34 @@
+name: FNC build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      # vždy aktuální kód přímo od autora, fork drží jen tenhle návod
+      - uses: actions/checkout@v4
+        with:
+          repository: Beingpax/VoiceInk
+      - name: Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
+      - name: Build
+        run: make local LOCAL_CODESIGN_IDENTITY=-
+      - name: Zip
+        run: |
+          cd ~/Downloads
+          ditto -c -k --keepParent VoiceInk.app "$GITHUB_WORKSPACE/VoiceInk.zip"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(defaults read ~/Downloads/VoiceInk.app/Contents/Info.plist CFBundleShortVersionString)
+          TAG="fnc-$VER-$(date +%Y%m%d-%H%M)"
+          gh release create "$TAG" VoiceInk.zip --title "VoiceInk $VER (FNC build)" -R ${{ github.repository }} --notes "Sestaveno z $(git rev-parse --short HEAD). Poprvé otevřít přes pravé tlačítko → Otevřít."
